@@ -23,12 +23,10 @@ jobs:
         with:
           flutter-version: '3.24.0'
           cache: true
+
       - name: Clean Gradle cache
         run: rm -rf ~/.gradle/caches/
         working-directory: mobile
-        with:
-          flutter-version: '3.24.0'
-          cache: true
 
       - name: Create local.properties
         run: echo "flutter.sdk=$FLUTTER_ROOT" > local.properties
