@@ -20,7 +20,20 @@ android {
         versionCode 1
         versionName "1.0"
     }
-    buildTypes { release { signingConfig signingConfigs.debug } }
+    buildTypes { 
+        release { 
+            signingConfig signingConfigs.debug 
+            // Habilitar shrinking para reducir tamaño del APK
+            shrinkResources true
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        } 
+    }
 }
-flutter { source '../..' }
-dependencies { implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.0" }
+flutter { 
+    source '../..' 
+}
+dependencies {
+    // NO agregar kotlin-stdlib explícitamente: Flutter lo gestiona automáticamente
+    // Solo dependencias nativas si son necesarias
+}
