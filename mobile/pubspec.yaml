@@ -1,4 +1,4 @@
-name: pos_samurai
+﻿name: pos_samurai
 version: 1.0.0
 environment: {sdk: ">=3.0.0 <4.0.0"}
 dependencies:
@@ -16,8 +16,4 @@ dev_dependencies:
   build_runner: ^2.4.9
 flutter: {uses-material-design: true}
 
-dependency_overrides:
-  # Forzar versión única de Kotlin stdlib para evitar duplicados en CI
-  org.jetbrains.kotlin:kotlin-stdlib: { require: "1.8.22" }
-  org.jetbrains.kotlin:kotlin-stdlib-jdk7: { require: "1.8.22" }
-  org.jetbrains.kotlin:kotlin-stdlib-jdk8: { require: "1.8.22" }
+
