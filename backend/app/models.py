@@ -1,6 +1,9 @@
 from sqlalchemy import Column, String, Float, Boolean, Integer, DateTime, ForeignKey, Text
 from sqlalchemy.orm import relationship
-from .database import Base
+try:
+    from .database import Base
+except ImportError:
+    from database import Base
 import datetime, uuid
 class User(Base):
     __tablename__ = "users"

@@ -1,3 +1,262 @@
-<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Caja SAMURAI</title>
-<style>body{font-family:system-ui;padding:20px;background:#f0f2f5}#status{position:fixed;top:10px;right:10px;padding:5px 10px;background:#333;color:#fff;border-radius:4px}.card{background:#fff;padding:15px;margin:10px;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.1);display:inline-block;width:200px}.notes{color:#d32f2f;font-weight:bold;margin:5px 0}input,button{padding:8px;margin:5px;border:1px solid #ccc;border-radius:4px}</style></head>
-<body><div id="status">Conectando...</div><h2>💰 Caja</h2><div id="orders"><p>Esperando pedidos...</p></div><hr><label>Cédula/RUC: <input id="doc"></label><label>Cliente: <input id="cname" readonly></label><button onclick="pay('TEST','CASH',document.getElementById('doc').value)">COBRAR</button><script src="app.js"></script></body></html>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Caja SAMURAI</title>
+    <style>
+        :root { --primary: #2c3e50; --accent: #27ae60; --bg: #f4f6f8; --white: #fff; --text: #333; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; background: var(--bg); display: flex; height: 100vh; overflow: hidden; color: var(--text); }
+
+        /* IZQUIERDA: MENÚ */
+        .menu-section { flex: 2; display: flex; flex-direction: column; padding: 15px; overflow: hidden; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .header h1 { margin: 0; font-size: 1.5rem; color: var(--primary); }
+        .status { padding: 5px 10px; border-radius: 20px; font-size: 0.8rem; background: #ddd; }
+        .status.online { background: #d4edda; color: #155724; }
+
+        .categories { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 10px; margin-bottom: 10px; }
+        .cat-btn { padding: 10px 20px; border: none; border-radius: 8px; background: var(--white); cursor: pointer; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.05); white-space: nowrap; transition: 0.2s; }
+        .cat-btn.active { background: var(--primary); color: white; }
+
+        .products-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; overflow-y: auto; padding-right: 5px; flex: 1; }
+        .product-card { background: var(--white); padding: 15px; border-radius: 10px; text-align: center; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.05); transition: 0.2s; display: flex; flex-direction: column; justify-content: space-between; height: 100px; }
+        .product-card:active { transform: scale(0.98); background: #eef; }
+        .product-name { font-weight: bold; font-size: 0.9rem; margin-bottom: 5px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .product-price { color: var(--accent); font-weight: bold; font-size: 1.1rem; }
+
+        /* DERECHA: TICKET */
+        .ticket-section { flex: 1; background: var(--white); display: flex; flex-direction: column; border-left: 1px solid #ddd; max-width: 400px; box-shadow: -5px 0 15px rgba(0,0,0,0.05); }
+        .ticket-header { padding: 15px; background: var(--primary); color: white; }
+        .ticket-items { flex: 1; overflow-y: auto; padding: 10px; }
+
+        .cart-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee; animation: slideIn 0.3s ease; }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+        .item-info { flex: 1; }
+        .item-name { font-weight: bold; font-size: 0.9rem; }
+        .item-notes { font-size: 0.75rem; color: #e67e22; font-style: italic; }
+        .item-controls { display: flex; align-items: center; gap: 8px; }
+        .qty-btn { width: 25px; height: 25px; border-radius: 50%; border: none; cursor: pointer; font-weight: bold; }
+        .btn-minus { background: #ff7675; color: white; }
+        .btn-plus { background: #55efc4; color: black; }
+
+        .ticket-footer { padding: 15px; border-top: 2px solid #eee; background: #fafafa; }
+        .total-row { display: flex; justify-content: space-between; font-size: 1.4rem; font-weight: bold; margin-bottom: 15px; }
+
+        .client-section { margin-bottom: 10px; display: flex; gap: 5px; }
+        .client-input { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 5px; }
+
+        .action-btn { width: 100%; padding: 15px; border: none; border-radius: 8px; font-size: 1.1rem; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .btn-pay { background: var(--accent); color: white; }
+        .btn-pay:hover { background: #219150; }
+        .btn-pay:disabled { background: #ccc; cursor: not-allowed; }
+
+        /* MODAL NOTAS */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 100; }
+        .modal-content { background: white; padding: 20px; border-radius: 10px; width: 300px; }
+        .note-tags { display: flex; flex-wrap: wrap; gap: 5px; margin: 10px 0; }
+        .tag { padding: 5px 10px; background: #eee; border-radius: 15px; cursor: pointer; font-size: 0.8rem; }
+        .tag.selected { background: var(--primary); color: white; }
+        .btn-confirm { width: 100%; padding: 10px; background: var(--accent); color: white; border: none; border-radius: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <!-- MENÚ -->
+    <div class="menu-section">
+        <div class="header">
+            <h1>💰 Caja SAMURAI</h1>
+            <span id="status" class="status">Conectando...</span>
+        </div>
+        <div class="categories" id="categories"></div>
+        <div class="products-grid" id="products"></div>
+    </div>
+
+    <!-- TICKET -->
+    <div class="ticket-section">
+        <div class="ticket-header">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span>Pedido Actual</span>
+                <label><input type="checkbox" id="takeout"> Para llevar</label>
+            </div>
+            <input type="number" id="table" placeholder="Mesa #" style="margin-top:5px; width:100%; padding:5px; border-radius:4px; border:none;">
+        </div>
+        <div class="ticket-items" id="cart-items">
+            <p style="text-align:center; color:#999; margin-top:50px;">Toca productos para agregar...</p>
+        </div>
+        <div class="ticket-footer">
+            <div class="client-section">
+                <input type="text" id="client-doc" class="client-input" placeholder="Cédula/RUC">
+                <input type="text" id="client-name" class="client-input" placeholder="Nombre Cliente">
+            </div>
+            <div class="total-row">
+                <span>TOTAL:</span>
+                <span id="total-price">$0.00</span>
+            </div>
+            <button class="action-btn btn-pay" onclick="payOrder()">💸 COBRAR</button>
+        </div>
+    </div>
+
+    <!-- MODAL NOTAS -->
+    <div id="modal-notes" class="modal">
+        <div class="modal-content">
+            <h3>Notas para cocina</h3>
+            <div class="note-tags" id="note-tags">
+                <!-- Tags generados por JS -->
+            </div>
+            <input type="text" id="custom-note" placeholder="Nota manual..." style="width:100%; padding:8px; margin-bottom:10px;">
+            <button class="btn-confirm" onclick="confirmNote()">Agregar</button>
+        </div>
+    </div>
+
+<script>
+    let products = [];
+    let cart = [];
+    let currentProductForNote = null;
+    let tempNote = "";
+
+    const API_URL = ""; // Relativo a localhost
+
+    async function init() {
+        try {
+            const res = await fetch(`${API_URL}/api/products`);
+            products = await res.json();
+            renderCategories();
+            renderProducts('TODOS');
+            document.getElementById('status').textContent = "✅ Online";
+            document.getElementById('status').classList.add('online');
+        } catch (e) {
+            document.getElementById('status').textContent = "❌ Error";
+            console.error(e);
+        }
+    }
+
+    function renderCategories() {
+        const cats = ['TODOS', ...new Set(products.map(p => p.category))];
+        const container = document.getElementById('categories');
+        container.innerHTML = cats.map(c =>
+            `<button class="cat-btn ${c === 'TODOS' ? 'active' : ''}" onclick="filterCat(this, '${c}')">${c}</button>`
+        ).join('');
+    }
+
+    function filterCat(btn, cat) {
+        document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderProducts(cat);
+    }
+
+    function renderProducts(cat) {
+        const list = cat === 'TODOS' ? products : products.filter(p => p.category === cat);
+        document.getElementById('products').innerHTML = list.map(p => `
+            <div class="product-card" onclick="openNoteModal('${p.id}', '${p.name}', ${p.price})">
+                <div class="product-name">${p.name}</div>
+                <div class="product-price">$${p.price.toFixed(2)}</div>
+            </div>
+        `).join('');
+    }
+
+    // Sistema de Notas
+    function openNoteModal(id, name, price) {
+        currentProductForNote = { id, name, price, qty: 1, notes: [] };
+        tempNote = "";
+        document.getElementById('modal-notes').style.display = 'flex';
+    }
+
+    function confirmNote() {
+        const manual = document.getElementById('custom-note').value;
+        if(manual) currentProductForNote.notes.push(manual);
+
+        addToCart(currentProductForNote);
+        document.getElementById('modal-notes').style.display = 'none';
+        document.getElementById('custom-note').value = "";
+    }
+
+    // Carrito
+    function addToCart(item) {
+        const existing = cart.find(c => c.id === item.id && JSON.stringify(c.notes) === JSON.stringify(item.notes));
+        if (existing) {
+            existing.qty++;
+        } else {
+            cart.push(item);
+        }
+        updateCartUI();
+    }
+
+    function updateCartUI() {
+        const container = document.getElementById('cart-items');
+        if (cart.length === 0) {
+            container.innerHTML = '<p style="text-align:center; color:#999; margin-top:50px;">Toca productos para agregar...</p>';
+            document.getElementById('total-price').textContent = "$0.00";
+            return;
+        }
+
+        let total = 0;
+        container.innerHTML = cart.map((item, idx) => {
+            const subtotal = item.price * item.qty;
+            total += subtotal;
+            return `
+            <div class="cart-item">
+                <div class="item-info">
+                    <div class="item-name">${item.name}</div>
+                    ${item.notes.length ? `<div class="item-notes">⚠️ ${item.notes.join(', ')}</div>` : ''}
+                    <div style="font-size:0.8rem; color:#666">$${item.price.toFixed(2)} c/u</div>
+                </div>
+                <div class="item-controls">
+                    <button class="qty-btn btn-minus" onclick="changeQty(${idx}, -1)">-</button>
+                    <span>${item.qty}</span>
+                    <button class="qty-btn btn-plus" onclick="changeQty(${idx}, 1)">+</button>
+                </div>
+            </div>`;
+        }).join('');
+
+        document.getElementById('total-price').textContent = `$${total.toFixed(2)}`;
+    }
+
+    function changeQty(idx, delta) {
+        cart[idx].qty += delta;
+        if (cart[idx].qty <= 0) cart.splice(idx, 1);
+        updateCartUI();
+    }
+
+    // API: Enviar Pedido
+    async function payOrder() {
+        if (cart.length === 0) return alert("El carrito está vacío");
+
+        const payload = {
+            table: document.getElementById('table').value || null,
+            takeout: document.getElementById('takeout').checked,
+            items: cart.map(c => ({ product_id: c.id, quantity: c.qty, notes: c.notes }))
+        };
+
+        const btn = document.querySelector('.btn-pay');
+        btn.disabled = true;
+        btn.textContent = "Procesando...";
+
+        try {
+            const res = await fetch(`${API_URL}/api/orders`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+
+            if (res.ok) {
+                alert("✅ Pedido enviado a cocina y cobrado.");
+                cart = [];
+                updateCartUI();
+                document.getElementById('table').value = "";
+                document.getElementById('client-doc').value = "";
+            } else {
+                alert("❌ Error al enviar pedido");
+            }
+        } catch (e) {
+            alert("❌ Error de conexión con el servidor");
+        } finally {
+            btn.disabled = false;
+            btn.textContent = "💸 COBRAR";
+        }
+    }
+
+    init();
+</script>
+</body>
+</html>

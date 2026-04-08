@@ -35,3 +35,27 @@ async def pay_order(order_id: str, payment: schemas.PaymentCreate, bg: Backgroun
     bg.add_task(printer_service.queue_print, order_id)
     if payment.client_doc: bg.add_task(sri_engine.generate, order_id, payment.client_doc)
     return {"status": "paid"}
+@router.get("/orders/{order_id}")
+async def get_order_details(order_id: str, db: Session = Depends(database.get_db)):
+    order = db.query(models.Order).filter(models.Order.id == order_id).first()
+    if not order:
+        raise HTTPException(404, "Pedido no encontrado")
+
+    items = []
+    for item in order.items:
+        product = db.query(models.Product).filter(models.Product.id == item.product_id).first()
+        items.append({
+            "id": item.id,
+            "product_name": product.name if product else "Producto no encontrado",
+            "quantity": item.quantity,
+            "notes": json.loads(item.notes) if item.notes else []
+        })
+
+    return {
+        "id": order.id,
+        "table": order.table,
+        "takeout": order.takeout,
+        "status": order.status,
+        "items": items,
+        "created_at": order.created_at.isoformat()
+    }

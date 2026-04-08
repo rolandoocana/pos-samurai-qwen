@@ -1,6 +1,9 @@
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
-from . import config
+try:
+    from . import config
+except ImportError:
+    import config
 engine = create_engine(f"sqlite:///{config.DB_PATH}?check_same_thread=False")
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 class Base(DeclarativeBase): pass
